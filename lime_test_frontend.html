@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIME Plot Test Rendering</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0f172a;
+            color: #f1f5f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background-color: #1e293b;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            max-width: 800px;
+            width: 100%;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        p {
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 30px;
+            font-size: 0.95rem;
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+        textarea {
+            width: 100%;
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            color: #10b981;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+        button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        button:hover {
+            background-color: #2563eb;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>XGBoost Feature Explanation (LIME)</h1>
+        <p>Rendered dynamically from the ML API response array.</p>
+
+        <label for="limeDataInput" style="display:block; margin-bottom:8px; font-weight: 500;">Paste API `lime_data` array here:</label>
+        <textarea id="limeDataInput" rows="6">
+[
+  ["skills_match_score > 0.76", 0.3244],
+  ["years_experience > 0.97", 0.3038],
+  ["education_level > 2.00", 0.1906],
+  ["0.01 < resume_length <= 0.76", -0.0507]
+]
+        </textarea>
+        <button onclick="updateChart()">Render LIME Chart</button>
+
+        <div class="chart-container">
+            <canvas id="limeChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let myChart = null;
+
+        function updateChart() {
+            try {
+                const inputText = document.getElementById('limeDataInput').value;
+                const limeData = JSON.parse(inputText);
+                renderChart(limeData);
+            } catch (e) {
+                alert("Invalid JSON format. Please paste the exact lime_data array from the API.");
+            }
+        }
+
+        function renderChart(limeData) {
+            // Sort data by absolute weight for better visualization (like original LIME)
+            // LIME usually plots features on the Y-axis and weight on the X-axis
+            
+            const labels = limeData.map(item => item[0]);
+            const values = limeData.map(item => item[1]);
+            
+            // Colors: Green for positive impact (supports "Shortlisted"), Red for negative (supports "Not Shortlisted")
+            const backgroundColors = values.map(val => val > 0 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(239, 68, 68, 0.8)');
+            const borderColors = values.map(val => val > 0 ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)');
+
+            const ctx = document.getElementById('limeChart').getContext('2d');
+            
+            if (myChart) {
+                myChart.destroy();
+            }
+
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Feature Contribution Weight',
+                        data: values,
+                        backgroundColor: backgroundColors,
+                        borderColor: borderColors,
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', // Horizontal bar chart
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let val = context.parsed.x.toFixed(4);
+                                    let impact = val > 0 ? "Increases chance of Shortlist" : "Decreases chance of Shortlist";
+                                    return `Weight: ${val} (${impact})`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#334155' },
+                            ticks: { color: '#94a3b8' },
+                            title: {
+                                display: true,
+                                text: 'Weight',
+                                color: '#cbd5e1'
+                            }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { color: '#e2e8f0', font: {size: 13} }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render default chart on load
+        updateChart();
+    </script>
+</body>
+</html>
